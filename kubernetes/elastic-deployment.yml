@@ -1,0 +1,251 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: elastic-1-deployment
+  namespace: default
+  labels:
+    app: elastic-1-deployment
+spec:
+  selector:
+    matchLabels:
+      app: elastic-1-deployment
+  template:
+    metadata:
+      labels:
+        app: elastic-1-deployment
+    spec:
+      containers:
+        - name: elastic-1-service
+          image: docker.elastic.co/elasticsearch/elasticsearch:7.17.4
+          volumeMounts:
+            - name: data01_7_17_4
+              mountPath: /usr/share/elasticsearch/data         
+          env:
+            - name: node.name
+              value: "elastic-1"
+            - name: cluster.name
+              value: "es-twitter-cluster"
+            - name: discovery.seed_hosts
+              value: "elastic-2,elastic-3"
+            - name: cluster.initial_master_nodes
+              value: "elastic-1,elastic-2,elastic-3"
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "1024Mi"
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+      volumes:
+        - name: data01_7_17_4
+
+---
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: order-deployment-hpa
+  namespace: default
+  labels:
+    app: order-deployment
+spec:
+  scaleTargetRef:
+    kind: Deployment
+    name: order-deployment
+    apiVersion: apps/v1
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        targetAverageUtilization: 85
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: default
+  labels:
+    app: postgres-deployment
+spec:
+  selector:
+    app: postgres-deployment
+  ports:
+    - name: postgres-service-port
+      protocol: TCP
+      port: 5432
+  type: ClusterIP     
+        
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-deployment
+  namespace: default
+  labels:
+    app: payment-deployment
+spec:
+  selector:
+    matchLabels:
+      app: payment-deployment
+  template:
+    metadata:
+      labels:
+        app: payment-deployment
+    spec:
+      containers:
+        - name: payment-service
+          image: skyglass/payment-service:1.0-SNAPSHOT
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres-service:5432/postgres?currentSchema=payment&binaryTransfer=true&reWriteBatchedInserts=true&stringtype=unspecified"
+            - name: SPRING_DATASOURCE_INITIALIZATION-MODE
+              value: "always"
+            - name: KAFKA-CONFIG_BOOTSTRAP-SERVERS
+              value: "gke-confluent-kafka-cp-kafka-headless:9092"
+            - name: KAFKA-CONFIG_SCHEMA-REGISTRY-URL
+              value: "http://gke-confluent-kafka-cp-schema-registry:8081"
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "1024Mi"
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+
+---
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: payment-deployment-hpa
+  namespace: default
+  labels:
+    app: payment-deployment
+spec:
+  scaleTargetRef:
+    kind: Deployment
+    name: payment-deployment
+    apiVersion: apps/v1
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        targetAverageUtilization: 85
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: restaurant-deployment
+  namespace: default
+  labels:
+    app: restaurant-deployment
+spec:
+  selector:
+    matchLabels:
+      app: restaurant-deployment
+  template:
+    metadata:
+      labels:
+        app: restaurant-deployment
+    spec:
+      containers:
+        - name: restaurant-service
+          image: skyglass/restaurant-service:1.0-SNAPSHOT
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres-service:5432/postgres?currentSchema=restaurant&binaryTransfer=true&reWriteBatchedInserts=true&stringtype=unspecified"
+            - name: SPRING_DATASOURCE_INITIALIZATION-MODE
+              value: "always"
+            - name: KAFKA-CONFIG_BOOTSTRAP-SERVERS
+              value: "gke-confluent-kafka-cp-kafka-headless:9092"
+            - name: KAFKA-CONFIG_SCHEMA-REGISTRY-URL
+              value: "http://gke-confluent-kafka-cp-schema-registry:8081"
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "1024Mi"
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+
+---
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: restaurant-deployment-hpa
+  namespace: default
+  labels:
+    app: restaurant-deployment
+spec:
+  scaleTargetRef:
+    kind: Deployment
+    name: restaurant-deployment
+    apiVersion: apps/v1
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        targetAverageUtilization: 85
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: customer-deployment
+  labels:
+    app: customer-deployment
+spec:
+  selector:
+    matchLabels:
+      app: customer-deployment
+  template:
+    metadata:
+      labels:
+        app: customer-deployment
+    spec:
+      containers:
+        - name: customer-service
+          image: skyglass/customer-service:1.0-SNAPSHOT
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres-service:5432/postgres?currentSchema=customer&binaryTransfer=true&reWriteBatchedInserts=true&stringtype=unspecified"
+            - name: SPRING_DATASOURCE_INITIALIZATION-MODE
+              value: "always"
+            - name: KAFKA-CONFIG_BOOTSTRAP-SERVERS
+              value: "gke-confluent-kafka-cp-kafka-headless:9092"
+            - name: KAFKA-CONFIG_SCHEMA-REGISTRY-URL
+              value: "http://gke-confluent-kafka-cp-schema-registry:8081"
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "1024Mi"
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+
+---
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: customer-deployment-hpa
+  namespace: default
+  labels:
+    app: customer-deployment
+spec:
+  scaleTargetRef:
+    kind: Deployment
+    name: customer-deployment
+    apiVersion: apps/v1
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        targetAverageUtilization: 85
